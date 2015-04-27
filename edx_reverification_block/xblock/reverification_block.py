@@ -52,31 +52,6 @@ class ReverificationBlock(XBlock):
     def course_id(self):
         return unicode(self.xmodule_runtime.course_id)  # pylint:disable=E1101
 
-    @property
-    def in_studio_preview(self):
-        """
-        Check whether we are in Studio preview mode.
-
-        Returns:
-            bool
-
-        """
-        # When we're running in Studio Preview mode, the XBlock won't provide us with a user ID.
-        # (Note that `self.xmodule_runtime` will still provide an anonymous
-        # student ID, so we can't rely on that)
-        return self.scope_ids.user_id is None
-
-    @property
-    def is_released(self):
-        """
-        Check if a xblock has been released.
-
-        Returns:
-            bool
-        """
-        # By default, assume that we're published, in case the runtime doesn't support publish date.
-        return self.runtime.modulestore.has_published_version(self) if hasattr(self.runtime, 'modulestore') else True
-
     def student_view(self, context=None):
         """Student view to render the re-verification link
 
@@ -101,20 +76,21 @@ class ReverificationBlock(XBlock):
         )
 
         if verification_status:
-            # TODO: What message will be displayed to user if it is already has any status?
-            fragment.add_content(unicode(verification_status))
+            if verification_status == "skipped":
+                fragment.add_content(unicode("You have skipped re-verification"))
+            else:
+                # TODO: What message will be displayed to user if the user already has a verification status?
+                fragment.add_content(unicode(verification_status))
         else:
             reverification_link = self.runtime.service(self, "reverification").start_verification(
                 course_id=course_id,
                 related_assessment=related_assessment,
                 item_id=item_id
             )
-            org = self.get_org()
             html = self._render_template(
                 "static/html/reverification.html",
                 {
-                    'reverification_link': reverification_link,
-                    'org': org
+                    'reverification_link': reverification_link
                 }
             )
             fragment.add_content(html)
@@ -202,12 +178,6 @@ class ReverificationBlock(XBlock):
         # This is not the real way course_ids should work, but this is a
         # temporary expediency for LMS integration
         return self.course_id if hasattr(self, "xmodule_runtime") else "edX/Enchantment_101/April_1"
-
-    def get_org(self):
-        """ Return the org """
-        # This is not the real way getting the org should work, but this is a
-        # temporary expediency for LMS integration
-        return self.xmodule_runtime.course_id.org if hasattr(self, "xmodule_runtime") else "edX ORG"
 
     def get_studio_preview(self):
         """ Return rendered studio view """
